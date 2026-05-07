@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hidden Cost Calculator — nufuture</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #000000; --ink-mid: #4a4a45; --ink-light: #8a8a82;
+    --surface: #f7f6f2; --white: #ffffff; --accent-mid: #2d6a3f;
+    --border: #e0dfd8; --border-strong: #c8c7be;
+  }
+  html { font-size: 16px; }
+  body { font-family: "Calibri","Trebuchet MS",sans-serif; background: var(--surface); color: var(--ink); min-height: 100vh; line-height: 1.6; }
+
+  /* PROGRESS BAR */
+  #progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: #00ff00; width: 0%; transition: width 0.2s; z-index: 999; }
+
+  header { background: var(--ink); padding: 1.5rem 2.5rem; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; max-width: 860px; margin: 2rem auto 0; border-radius: 8px 8px 0 0; min-height: 80px; }
+  .intro { background: var(--white); border: 1px solid var(--border); border-top: none; padding: 2rem 2.5rem; max-width: 860px; margin: 0 auto 0; border-radius: 0 0 8px 8px; }
+  .intro h1 { font-weight: 700; font-size: 1.5rem; color: var(--ink); line-height: 1.3; margin-bottom: 1rem; letter-spacing: -0.01em; text-align: center; }
+  .intro p { font-size: 15px; color: var(--ink); line-height: 1.7; text-align: center; }
+  .main { max-width: 860px; margin: 0 auto; padding: 1.5rem 0 1rem 0; display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; align-items: start; }
+
+  /* SECTION DIVIDER */
+  .section-divider { max-width: 530px; margin: 0 0 1rem 0; padding: 6px 12px; background: rgba(0,255,0,0.08); border-radius: 6px; border-left: 2px solid #00ff00; font-size: 11px; font-weight: 500; color: var(--ink-mid); letter-spacing: 0.03em; }
+
+  .section { background: var(--white); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
+  .section-head { padding: 1rem 1.25rem 0.875rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .section-number { font-size: 11px; font-weight: 400; color: var(--ink); letter-spacing: 0.08em; margin-right: 10px; }
+  .section-progress { font-size: 10px; color: var(--ink-light); display: block; margin-top: 3px; }
+  .section-title { font-size: 14px; font-weight: 700; color: var(--ink); }
+  .section-cost { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .section-body { padding: 1.5rem; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .field-grid.one { grid-template-columns: 1fr; }
+  .field-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .field input[type="number"] { font-family: "Calibri","Trebuchet MS",sans-serif; font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 9px 11px; width: 100%; transition: border-color 0.15s; -moz-appearance: textfield; }
+  .field input[type="number"]::-webkit-outer-spin-button, .field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .field input[type="number"]:focus { outline: none; border-color: var(--accent-mid); background: var(--white); }
+  .field input[type="number"].is-default { color: var(--ink-light); }
+  .field input[type="number"].is-user { color: var(--ink); border-color: var(--accent-mid); }
+  .hint { font-size: 12px; color: var(--ink); line-height: 1.55; padding: 8px 10px; background: var(--surface); border-radius: 6px; border-left: 2px solid #c8c7be; margin-top: 4px; }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .toggle-row label.tlabel { font-size: 13px; color: var(--ink); flex: 1; }
+  .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch-track { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--border-strong); border-radius: 22px; transition: background 0.2s; }
+  .switch-track:before { content: ""; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: transform 0.2s; }
+  .switch input:checked + .switch-track { background: #00ff00; }
+  .switch input:checked + .switch-track:before { transform: translateX(18px); }
+  .conditional { display: none; }
+  .conditional.on { display: block; }
+
+  /* CONSULTANCY COMPARISON BOX */
+  .consultancy-box { background: rgba(0,255,0,0.04); border: 1px solid rgba(0,200,0,0.2); border-radius: 6px; padding: 12px; margin-top: 12px; }
+  .consultancy-box-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-mid); margin-bottom: 8px; }
+  .consultancy-box-row { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .consultancy-box-row:last-of-type { border-bottom: none; }
+  .consultancy-box-copy { font-size: 12px; color: var(--ink); line-height: 1.55; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+  /* SIDEBAR */
+  .sidebar { position: sticky; top: 1.5rem; align-self: start; width: 320px; }
+  .results-card { background: var(--ink); border-radius: 8px; display: inline-block; width: 100%; }
+  .results-head { padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .results-eyebrow { font-size: 10px; font-weight: 500; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+  .results-heading { font-family: "Calibri","Trebuchet MS",sans-serif; font-weight: 700; font-size: 1rem; color: white; letter-spacing: 0.02em; }
+  .results-body { padding: 1.25rem 1.5rem; }
+  .cost-line { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06); gap: 8px; }
+  .cost-name { font-size: 12px; color: rgba(255,255,255,1); flex: 1; }
+  .cost-val { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); font-variant-numeric: tabular-nums; text-align: right; }
+  .cost-val.active { color: #FF7E00; }
+  #r_total { color: #FF0000 !important; }
+  .total-block { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.15); }
+  .total-label { font-size: 11px; font-weight: 500; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+  .total-figure { font-family: "Calibri","Trebuchet MS",sans-serif; font-weight: 700; font-size: 2.25rem; color: white; letter-spacing: -0.02em; line-height: 1; }
+  .total-note { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+  .verdict-block { margin: 0 1.5rem 1.25rem; padding: 12px 14px; border-radius: 6px; font-size: 12px; line-height: 1.6; display: none; }
+  .verdict-block.low { background: rgba(111,207,138,0.12); color: #00ff00; border-left: 2px solid #00ff00; }
+  .verdict-block.med { background: rgba(250,199,117,0.12); color: #fac775; border-left: 2px solid #fac775; }
+  .verdict-block.high { background: rgba(240,149,149,0.12); color: #f09595; border-left: 2px solid #f09595; }
+  .verdict-block.red { background: rgba(255,0,0,0.1); color: #FF0000; border-left: 2px solid #FF0000; }
+  .verdict-block.amber { background: rgba(255,126,0,0.1); color: #FF7E00; border-left: 2px solid #FF7E00; }
+  .roi-block { margin: 0 1.5rem 1.25rem; padding: 14px; border-radius: 6px; background: rgba(0,255,0,0.06); border: 1px solid rgba(0,255,0,0.2); display: none; }
+  .cta-block { padding: 1rem 1.5rem 0.75rem; border-top: 1px solid rgba(255,255,255,0.08); }
+  .cta-block p { font-size: 12px; color: white; margin-bottom: 8px; line-height: 1.55; }
+  .cta-btn { display: block; width: 100%; box-sizing: border-box; padding: 8px 16px; background: transparent; color: white; font-family: "Calibri","Trebuchet MS",sans-serif; font-size: 12px; font-weight: 500; border: 1px solid #00ff00; border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.15s; text-decoration: none; margin-top: 6px; }
+  .cta-btn:hover { background: #00ff00; color: #0f0f0d; }
+  .reset-btn { display: block; width: 100%; box-sizing: border-box; padding: 8px 16px; background: #000; color: white; font-family: "Calibri","Trebuchet MS",sans-serif; font-size: 12px; font-weight: 500; border: 1px solid #00ff00; border-radius: 6px; cursor: pointer; text-align: center; margin-top: 5px; transition: all 0.15s; }
+  .reset-btn:hover { background: #00ff00; color: #0f0f0d; }
+  .section:last-of-type { margin-bottom: 1rem; }
+  @media (max-width: 720px) {
+    .main { grid-template-columns: 1fr; padding: 1.5rem 1.25rem; }
+    header { padding: 1.5rem 1.25rem; margin: 1rem 1.25rem 0; text-align: center; }
+    header div { text-align: center; width: 100%; }
+    .intro { padding: 1.75rem 1.25rem 1.5rem; margin: 0 1.25rem; }
+    .intro h1 { font-size: 1.2rem; }
+    .sidebar { display: block; width: 100%; position: static; margin-top: 1rem; }
+    .sidebar .results-panel { border-radius: 8px; }
+    .cta-btn { font-size: 14px; padding: 12px; }
+  }
+  @media print { #progress-bar, header, .intro, footer { display: none !important; } .main { display: none !important; } .sidebar { display: none !important; } }
+  #print-summary { display: none; padding: 2rem; font-family: "Calibri","Trebuchet MS",sans-serif; }
+</style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<header>
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKwAAAAsCAIAAAB348RXAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAATJ0lEQVR42u1cfWxURbt/ZuacLS0tULqlgAIFERa8pdiCYgnQCkVBSEEQFe8FKWgCF2PehEQlErDkzTXWXNEAr+AHl68bQ94IlY/Kh4oK6QvhFqGApSlQbi/9oEs/lrLb3XNm5v7xtMPp2Xa7RUB87aRpNmdn5pkz85vf8zHPLIMHrBBCNE0jhEgpoavcnzl/oEbDGOOc4+eIiIg+ffr06NEDH168eNE0zbsukVKamJjIGEPMUUo9Hk9VVVUXMn6fQikFgMjIyPnz5+/atau0tPTWrVuccyllXV1dfHw88sRdpBwA6NWrV0VFhWEYfr/f5/MZhrF161aE459n5rUHBwFCiDlz5qxdu3bEiBH3U7Su65qmAYCUkhDyp1r+BwgESPh//etfV65cCQCoEQghaBnca/tACCGllFIKIZRe6ALB74CA1atXr1y50jRNSimuBK4NpZQQgpri3pmiqBrUhy4Q/A4IGD9+/Jo1a0zTZIyp9UBallIahhEIBLpspn9aECD3rl692sr/+Hn79u15eXmXL1/2er2c89raWlW/q/yzuQNDhw4NBAJCCOR/dAcWLFhwHwIS6B1cv34dtY9pmlLK7du3P1DeQZhKCpUmls7qNa2DIAK1hBJwE4qWD+FHIoLnkwPIZo8gLS1N13XOOaoGxtjWrVu3bdsWGRmpTDa0Fm0vht+GDzhbc9Vz8GxqmqYUE9YUQtjskk5JDzZrVHMb2qzPCSG4JUK/F6UUq9lqhtlDOyDAtZcAAoC3KRmAhI0GCRAyxoMOIb4DpdQ0zTVr1gCAz+e7uy5AmDX9fr9pmsGBKRXFujOt117z4OeUUmt9xlibgENUIYMCQExMTFxcXPfu3YUQ9fX1brfbMIzQPbQPAtq89gQI7UtgOIGBAD0BJEADwP+CvChltZS4/lg5BAdIoN0pfZHKaAkcgAAQAD8RfxeyVmAnsbGx1h0TCAQmT57s8XjwJdFF9Hq9Fy5cGDt2rBAC7QZK6fHjx8vLyzt0ILHCyJEjR40ahXSCW/zw4cO1tbVWesDPI0aMWLhwoa7ryj3x+XzHjh0bN24cVkBPsrCwsKSkJEzpgwcPfvLJJ62DP3r0aFVVVURExLRp0yIiInAPqG4BYOLEiVlZWampqU6n0zTNuXPnlpaWInciryBKRo8enZWVlZ6ePmzYsNjYWIfDIaX0+XwVFRVnz549dOjQgQMHKioqoHU0NrSxDgBAHVT7V03L11gtI5ISSUASkIRIQiSlN5h2QGMva1SjqkkIgGkv60QyaOkEJCGSsr9oAMAiGABs3rwZXQDZfnG73cuXL7c9nD9/fjjKGwNBa9assTVPTU0FgN69eyuboD3pPp/vxRdftD1csWKF6rxD6YsXL7Y1nz59OgA4nU6v12t9vmDBgpEjRx45csRWPzk52abUxo0bt3fvXqUIQkzdunXrHn74YaUg2mR2CwI4sAka/Qfj24X5LOexQkopOYAJYILkIKUUvYU5jYv/5rSAaU9pwEPiAEBGSckF+Js7gSaQppSRoXYPtxTTNDnnDQ0Nfr+fc24YBuc8EAjg//AJGZsj1aueQ1C3VXp9fX0gEECh2An+D1+6GrB6BeRqKWVDQwMKwjJv3rzjx49PnjwZDVXTNPEDcj5qCk3T3n///WPHjs2YMQMVaDAUhBA42ri4uDfffLOwsDA7O1tF4dpRBwyAg/aKLv9LmBoH02IVsiAdL0ACmGNMepSyf9P4LhObt6ONW3pgFpmiY69BLQmyH0YOlIXVHqhD0DLGoKyhiA6NOJt0Fbq4M+lq2NYNjd2iIAB47rnncBswxpD8lcFECDFNMy4u7quvvpoyZQqClTGmaZp1+ZVDoUbLOY+Pj//iiy/GjBnzxhtvKK3UGgSIgKc1sU0IIoCHdBoULDgIB6c7GavU+M8hcdBmJx05b9bPHbLuvfAe1Qdd1++baFwhFTPFhaSU6roupYyPj//2229TUlIMw0AXRlVrE5Scc0opooRzvnTp0vj4+JdeegkRoHCgoZ1Pu1O5GQQVdnrnALLFoBOtiYEBcCI0wTYzmkJFk0BL8LeHjxobG9X4cNvV19fftzCRYRherxfnFI242tra+yZd2fwYPm9oaLhy5YrH4/F4PA6HY/fu3YgAxKWqBgDnz58vLi6+fv06pTQhIcHlcrlcLvwKq2maZhjG3LlzN2/evHjxYk3TlELUgAGYQF+m/BEOZmsOkAAMiNq2FCTIZkwoHJggXIK+QGGbAK0Db7DD5SeEeDyetLQ0t9uN+g9pwOfzZWRk3OuIIbJrXl7e0qVLHQ4HalBN05qamoYNG2Yl7XtNBpTSGzduvPfee19//XVFRQW+9YYNG8aPH68QgKM1TfPzzz//7LPPzpw5YzX+dV1PSUl5/fXXFy1ahGoF6cQwjOzs7MLCwg0bNih/QQMBBIh8EaRszdISCCH0EIU9AOUSAGAgIbOBTxFSyts1CUgpyTwg20CKuzAFUsqKior6+vo7dvR/Y/F6vW632/bwXuSzhEBAaWnpzJkzi4uLlZc/ZcqUZcuWmaZpRUBJScmrr75aUFCgzAsrn504ceLEiRM7duz48ssvExMTFR8IIT744IODBw9eunSpGR8gAGJA/otstgRbrDlCiPYfTD7D+d9Mvo/zfZxvNEWm0D7UCCG3LTsKQECOkiSKNuuL31wcDoeynlS22f0MZiuh1g/3zSCoqKiYOnVqcXGxrutIh4yx999/X9koaAScOXNm0qRJBQUFmqbhmK1eFU6gpmk//PBDRkaGNcYgpYyKilq7dq2iVQoApA+B3q21AAXyf5Sv4YJI0AEYAAPQQRDBV5ukijSHFNXonRKcHVt84ZNBcLnPx1q/i3RUNzk5OVeuXEHqJoQIIaZOnZqSkoK7HxmxpqYmKyurqqoKVXtwQFCdhui6XlZWNnv27MbGRmVjSSnnzJnjcrmQHigAEJ20MgYFAAApljIggQAYAByAAxgABKRXkpLb1Zp1AiMk4s94En93EcAY8/l8+fn5KiCIZeHChQqLaKuuWrXq6tWr3bp1Q6slRJFSRkZGnjt3Ljc3V/mcnHNd1zHaRkMka0h/i1Nge05Aml1Ldk9AAADXrl2rrq7GnY0MHxMTM2HCBKR3VARnz57dtGkTADQ1NZlhFDyFycnJKS8vRy5BtZKZmYmA0EJH/ts+EOoq96w0NjaqSCjygcvl6tevHxIA7mNCSG5ursPhCN9YJoRYc3Nw87tcrri4uBs3bmhd8/5gUoIqQ4YMUcYgLl5SUlJSUtJvsXxRRM+ePfv169cFgge6IGljrr0NJXd2rm0NmaO6iYyMhAcn5byrtFcwMGCjhztzWa3qwxr46gLBg17wuNJ2nnK3st+wnz8pCP4QCas4yJqaGtv2LSsrq6io6OwVCXUuZX148+bNPxIIgs/vO7UbbOeQ6kQ/zJXAsLH1BPaOpeOeDicdAWVdunQJXYNmd07T8vPzly1bdhfn9g8DAtwQKucMAAYMGBBOQBcrDxw40PrQ6/ViDnuYpa6urqmpCYMzWBITE8PfgoMGDQJLWoAQoq6urkNCwm9LSkoqKyv79++vkl2zsrLeeustlZIUpjuQkJCQk5OjTikZY2VlZWvXroVWmUUPakFzpry83OPxKLMWAKZOndrhLGB9XdcnTZpk9Y6uXbuGqOpwErFCZWUlXlVWmzIjI0M57qEHL6WcMmWKVa/fuHGjvLw8HBAwxhobG48ePaoynjnn/fv3X7JkCUaRZRgFx7lixYolS5ZkZ2dnZ2cvWbJk0aJFffv2RRGdBgGB1nlBBABAalI6ghCFJ1KYSSbvPOKEq15VVfXrr7+qHAohRHp6+hNPPIEMGYKHhRDz5s0bOnQoZljgqhQWFiLDB6+i7bwKJ7GpqenMmTPWOU1KSpo5c6YQIkTKCUpPT09/6qmn1LCllOfOnQuHCVTZtm2byndC6atXrx4+fDimlnSoiQzDGDVq1NKlSw3DwBgi3sJev349zgDtLAQkSOJp/ZADUEknERAEGIDW8seBCAJTiMLK7W5uds7DQQV84MABq1bWNG3Tpk1RUVGmabY5F3gGM3DgwNzcXBUrRQ2yd+9eFUdramqyauvExEQbweDsf/PNNzZwrFu3LiEhQR3wB8++aZo9evTYuHGjjZz27dsX5osjcI8cOXLy5EmkARxDz5499+zZM2DAAHz3NsP/hBBd103TjI2N3blzZ2RkJOai4fMjR45cuHDhNpkxF6MmA0lAEJAETAKS0P2MALEnGGI22gcaCAJGSwKxICCAVjNtok4sq02AaP+uEU6B3041Bk6IpOzZNrKNcZe0+VME+JJDhgzx+Xycc+tdpfz8/B49ekDLpRFVlOYuKipSlbFteXl5TEwMaSmFhYXqKyGEz+d75JFHAMDhcKjrsIQQzEvGBE7V4cmTJx966CG16qrg4OPi4r7//ntVGdt6PJ7+/ftjE+v9J6xz+vRpWyQAN0B6ero1JxsvS126dGnChAnWrYLSrdlmQ4cOPXnypHUMmJg6ZsyYVuZtJ0DAAADYc4zI1ksrCEhCBWOHNPafjK5l7G8a+x+NSGpNNgdBQBBaz2g8BQCmhwsCNdz169cHz0VRUdEzzzxj2wcOh+OVV165du2aen/VcPny5bhm2OeWLVuEEPgVdrh//37b5saab7/9drD0K1euvPDCC8HOwowZM4qLi1U11RAzAxCm4YBASf/oo4+klIFAAHvD+qZpbty4ERPSbWXQoEHvvPMO5sapMWDzDz/80IoAgiCQ50Aw0Zw6xgEY0ANUPickk63SRwkAAI0k5DzjgzhmHtxW88EcL1obCiaABtp2jS8wJZMMGOd88+bNr732mrqSXF9fP2zYsJqaGltGLJJBbGzs6dOnBwwYgGYRtOTYAMCpU6d++umnq1evUkofffTRjIwMvNukjGpkzoKCgkmTJuEMIsFmZWXt2bNH9YMmyIkTJz755JNTp0653W7TNG/duiWldDgcBQUFo0ePVgpIdV5UVPTjjz+iOzd48OCJEyc+/vjj1uHhh9LS0tTUVDzaF0L06tWrpKQkPj5eWRu//PILNrS+vrpnuH///szMTFuOIY759OnTRUVFlZWVUkqn0zl8+PCUlJTo6GhrNWz4888/Z2Zm2rMQOsEELWSgLdKIpBAg9o1uEjBa/njrbzkBk1AfYy6GNiPOTphMoJA7YcIEv9+v7o8qJg+2iq3PcRdWVVXheYxSooQQh8OBRp/a4oo5/H6/2+0uKytTnD9ixIi6ujrr3sJMnmDpanOryrdu3UISVinnYTKBMmV69ux57Ngx63RZ5yG4qJUWQiAHnDlzpk+fPtA6r7/zIIDm7FNtpw6IA9tit/lnNlsD+uu66razIFBNZs2aha+kWuFiGJaiFkBRfXV19dixY23vjx2mpaWpDlVvVgpFRx93/8SJExEHeJm6Q+nYs9frnTZtmpLYWRCoYcfExOTl5QWvsW0A1q/Uixw+fLhtBAAAG86oEQSCfe2DgABQoDrTtuvNWt9sXubmHlrUP/DblEAF0/+iW/vE6fj0008Nw/D5fIFAwDCMmpqa0L9Rha0yMjIuX76sdjkaO8JScBXVop46dcrlcrUZ6cMZmTVrFqa6I2iwQ/x/8+ZNjDWp/O7k5OSzZ8+GL/3ixYtpaWnW0KHtZ7MCgYDf7zcM49SpUyGOiNTirVq1yufzWQcgWhfbAJqamnJyclB625lEbCSjkoGA5lU0CAhCD7UPghbjgADRXtfZlbYMwNaXD7XjOpuk2TrECd2xY4eNxBISEkIflGFDp9P58ccfNzQ0hA6VVFVVvfvuuxjsay/Wi8+TkpLy8vKCub2pqUmBQFXu3r17Tk5OTU1NaOm1tbW5ubm9evWySce3i42NVYYelkuXLoU+J1RB0tGjR+/atcvv94cegNfr3blzp7Ic2+yWAADtT8k5JmJbWYDsC8qXmHbDMAgHIIH2ZHQWkVkgH5fQDyACJEgCBG4BXAX6DwJ/B5HPBUjbLSV0UjMzM5OTkzGpklLq9/u3bNmC1z9CxFJUznxiYuLzzz+fmZn52GOPOZ1OvOHr9/srKyvPnj2bn5+/Z88eFXIOEeBTHSYnJ0+fPj0tLW3IkCFOpzMqKsrn86WmppaXl6se1Ie+ffvOnj372WefTUpKSkhIiIiIIIT4/f7r16+fP3/+4MGDu3fvxuCgTTq+XURExKJFi6KiovArxlh1dfWOHTvCCZzgaEeOHDl79uynn37a5XL17t0bbyX7/f7q6uoLFy589913e/fuLS0thZAX1EnzBfJEKhNurxABgGIpGmXHl4pa1pUAgW6E9APoBaBJ8FO4IWWVBA5h3WO/o5wLa0JmVFSU0+mMjo6WUno8HrfbrQ5pOrygbyVbtVSMsejoaKQQt9tty+OwSe/WrZvT6YyJiQGAxsZGt9utfl8hTOmdLbbRRkdHI2SllDdv3nS73SoIZqvZ3nb+jasBwABkO3cRtZbfu5DtgtrGUZ266YG+k/qthuCew/mpjuAOw8zeCVE5xMBCHG92NmsohJQwBwAA/w88emdhlM5sdAAAAABJRU5ErkJggg==" alt="nufuture" style="height:44px;width:auto;display:block;" />
+  <div style="font-family:'Calibri','Trebuchet MS',sans-serif;font-size:13px;font-weight:400;color:rgba(255,255,255,0.85);letter-spacing:0.04em;">think differently<span style="color:#00ff00;">.</span> take action<span style="color:#00ff00;">.</span> discover hiring breakthroughs<span style="color:#00ff00;">.</span></div>
+</header>
+
+<div class="intro">
+  <h1><div>Life Sciences companies account for the recruitment fee.</div><div style="margin-top:0.4rem;">Almost none account for the cost of a broken hiring process.</div></h1>
+  <p style="margin-top:0.4rem;">Most leaders have never seen these costs on a single page... you are about to.</p>
+</div>
+
+<div class="main">
+  <div class="left-col" style="padding:0;">
+
+    <!-- 01 START HERE -->
+    <div class="section">
+      <div class="section-head">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="section-title" style="font-size:13px;color:var(--ink);font-weight:700;">How to use this calculator</span>
+        </div>
+      </div>
+      <div class="section-body">
+        <p style="font-size:12px;color:var(--ink);line-height:1.55;margin:0;padding:8px 10px;background:var(--surface);border-radius:3px;border-left:2px solid #c8c7be;">Every field is pre-populated with Life Sciences IT benchmarks. Change anything that does not reflect your situation. Some sections are toggled off by default, turn them on if they apply.<br><br>Or clear everything and start with your own numbers. The total automatically updates as you go.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;"><button class="reset-btn" style="margin-top:0;" onclick="clearCalculator()">Clear calculator</button><button class="reset-btn" style="margin-top:0;" onclick="resetForm()">Reset calculator</button></div>
+      </div>
+    </div>
+
+    <!-- 02 ROLE DETAILS -->
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Role details</span>
+          <div class="section-progress">1 of 8</div>
+        </div>
+        <span class="section-cost" id="s2_cost" style="display:none;">£0</span>
+      </div>
+      <div class="section-body">
+        <div class="field-grid">
+          <div class="field"><label>Annual salary (£)</label><input type="number" id="salary" value="75000" min="0" class="is-default" /></div>
+          <div class="field"><label>Number of hires</label><input type="number" id="num_hires" value="1" min="1" class="is-default" /></div>
+        </div>
+        <div class="hint">Enter the base salary for this role. If you are hiring more than one person at this level, enter the total number of hires.</div>
+      </div>
+    </div>
+
+    <!-- 03 MANAGEMENT TIME -->
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Management time:</span>
+          <div class="section-progress">2 of 8</div>
+        </div>
+        <span class="section-cost" id="s3_cost">£0</span>
+      </div>
+      <div class="section-body">
+        <div class="field-grid">
+          <div class="field"><label>Hiring manager hours p/w</label><input type="number" id="hm_hours" value="4" min="0" class="is-default" /></div>
+          <div class="field"><label>HR / Talent hours p/w</label><input type="number" id="hr_hours" value="6" min="0" class="is-default" /></div>
+        </div>
+        <div class="field-grid three" style="align-items:end;">
+          <div class="field"><label>Hiring manager annual salary (£)</label><input type="number" id="hm_salary" value="90000" min="0" class="is-default" /></div>
+          <div class="field"><label>Average HR annual salary (£)</label><input type="number" id="hr_salary" value="70000" min="0" class="is-default" /></div>
+          <div class="field"><label>Weeks the search has overrun</label><input type="number" id="weeks_over" value="10" min="0" class="is-default" /></div>
+        </div>
+        <div class="hint">Time spent managing a search that is not moving is not free. At a senior level, every hour has a real commercial value.</div>
+      </div>
+    </div>
+
+    <!-- 04 TEAM ABSORPTION -->
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Team absorption:</span>
+          <div class="section-progress">3 of 8</div>
+        </div>
+        <span class="section-cost" id="s4_cost">£0</span>
+      </div>
+      <div class="section-body">
+        <div class="field-grid" style="align-items:start;">
+          <div class="field"><label>Weeks the role has been open</label><input type="number" id="weeks_open" value="12" min="0" class="is-default" /></div>
+          <div class="field"><label>People covering the gap</label><input type="number" id="covering_people" value="2" min="0" class="is-default" /></div>
+        </div>
+        <div class="field-grid" style="align-items:start;">
+          <div class="field"><label>Their average salary (£)</label><input type="number" id="covering_salary" value="65000" min="0" class="is-default" /></div>
+          <div class="field"><label>Extra work days p/w</label><input type="number" id="extra_days" value="1" min="0" max="5" step="0.5" class="is-default" /></div>
+        </div>
+        <div class="hint">A well-run process typically takes 4 to 6 weeks. Every week beyond that compounds. In a regulated environment, stretched teams do not just slow down, processes lose consistency and audit trails start to show it.</div>
+      </div>
+    </div>
+
+    <!-- 05 CONTRACTOR COVER -->
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Contractor cover:</span>
+          <div class="section-progress">4 of 8</div>
+        </div>
+        <span class="section-cost" id="s5_cost">£0</span><span id="s5_note" style="display:none;font-size:10px;color:var(--ink-light);margin-left:6px;">team outside total</span>
+      </div>
+      <div class="section-body">
+        <div class="toggle-row">
+          <label class="tlabel">Contractor currently in place?</label>
+          <span style="font-size:11px;color:var(--ink);margin-right:8px;">Toggle on to calculate</span>
+          <label class="switch"><input type="checkbox" id="contractor_toggle" checked /><span class="switch-track"></span></label>
+        </div>
+        <div class="conditional on" id="contractor_fields">
+          <div class="field-grid">
+            <div class="field"><label>Day rate (£)</label><input type="number" id="day_rate" value="550" min="0" class="is-default" /></div>
+            <div class="field"><label>Weeks in place</label><input type="number" id="contractor_weeks" value="26" min="0" class="is-default" /></div>
+          </div>
+          <div class="toggle-row" style="margin-top:4px;margin-bottom:8px;">
+            <label class="tlabel">Contractor is inside IR35</label>
+            <label class="switch"><input type="checkbox" id="ir35_toggle" /><span class="switch-track"></span></label>
+          </div>
+          <div class="hint" id="ir35_hint">At £400 to £800 per day, a 26-week cover engagement costs between £52,000 and £104,000. That is the direct cost of a delayed or failed process.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 06 CONSULTANCY SPEND -->
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Consultancy spend</span>
+          <div class="section-progress">5 of 8</div>
+        </div>
+        <span class="section-cost" id="s6_cost">£0</span>
+      </div>
+      <div class="section-body">
+        <div id="consultancy_main_fields">
+          <p style="font-size:12px;color:var(--ink);font-weight:500;margin-bottom:12px;">Select what applies to your situation.</p>
+
+          <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;">
+            <div class="toggle-row" style="margin-bottom:8px;">
+              <label class="tlabel">Single consultant filling a capability gap</label>
+              <span style="font-size:11px;color:var(--ink);margin-right:8px;">Toggle on to calculate</span>
+              <label class="switch"><input type="checkbox" id="single_consultant_toggle" /><span class="switch-track"></span></label>
+            </div>
+            <div class="conditional" id="single_consultant_fields">
+              <div class="field-grid">
+                <div class="field"><label>Day rate (£)</label><input type="number" id="single_consultant_rate" value="1500" min="0" class="is-default" /></div>
+                <div class="field"><label>Weeks engaged</label><input type="number" id="single_consultant_weeks" value="26" min="0" class="is-default" /></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:10px;">
+                <span style="font-size:13px;font-weight:600;color:var(--ink);">Single consultant cost</span>
+                <span style="font-size:14px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums;" id="single_cost_display">£0</span>
+              </div>
+              <div class="hint" id="sc_hint">You are paying £1,500 per day for a consultant to cover a gap that a £75,000 permanent hire would solve. This spend does not stop here, it compounds and the cost feeds into your total exposure.</div>
+            </div>
+          </div>
+
+          <div style="font-size:12px;font-weight:500;color:var(--ink);margin-bottom:8px;">Outside recruitment total</div>
+          <div style="border:1px solid var(--border);border-radius:6px;padding:12px;">
+            <div class="toggle-row" style="margin-bottom:8px;">
+              <label class="tlabel">Consultancy team engaged</label>
+              <span style="font-size:11px;color:var(--ink);margin-right:8px;">Toggle on to calculate</span>
+              <label class="switch"><input type="checkbox" id="consultancy_toggle" /><span class="switch-track"></span></label>
+            </div>
+            <div class="conditional" id="consultancy_fields">
+              <div class="field-grid">
+                <div class="field"><label>Number of consultants</label><input type="number" id="consultancy_headcount" value="5" min="1" class="is-default" /></div>
+                <div class="field"><label>Average day rate per consultant (£)</label><input type="number" id="consultancy_rate" value="1500" min="0" class="is-default" /></div>
+              </div>
+              <div class="field-grid one">
+                <div class="field"><label>Weeks engaged</label><input type="number" id="consultancy_days" value="26" min="0" class="is-default" /></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:10px;">
+                <span style="font-size:13px;font-weight:600;color:var(--ink);">Consultancy team cost</span>
+                <span style="font-size:14px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums;" id="team_cost_display">£0</span>
+              </div>
+              <div class="hint" id="team_hint">Sometimes a consultancy engagement is the right call; a defined programme, a one-off transformation, a regulatory deadline. The problem is when consultancy spend is plugging a gap that permanent hires should have filled. If your consultancy bill keeps growing, that is a recruitment problem wearing a different label.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 07 FAILED HIRE -->
+    <!-- 08 DELIVERY IMPACT -->
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Delivery impact:</span>
+          <div class="section-progress">6 of 8</div>
+        </div>
+        <span class="section-cost" id="s7_cost">£0</span>
+      </div>
+      <div class="section-body">
+        <div class="toggle-row">
+          <label class="tlabel">Project or validation milestone delayed?</label>
+          <span style="font-size:11px;color:var(--ink);margin-right:8px;">Toggle on to calculate</span>
+          <label class="switch"><input type="checkbox" id="delivery_toggle" checked /><span class="switch-track"></span></label>
+        </div>
+        <div class="conditional on" id="delivery_fields">
+          <div class="field-grid one">
+            <div class="field"><label>Estimated commercial or compliance cost of the delay (£)</label><input type="number" id="delivery_cost" value="50000" min="0" class="is-default" /></div>
+          </div>
+          <div class="hint">Delayed product releases, pushed validation windows and compliance gaps rarely get traced back to a recruitment problem... but they should. In a GMP-governed environment, a delayed validation or missed regulatory submission can have consequences well beyond the figure entered here. This captures the direct cost only.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 09 ONBOARDING COST -->
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Onboarding cost:</span>
+          <div class="section-progress">7 of 8</div>
+        </div>
+        <span class="section-cost" id="s8_cost">£0</span>
+      </div>
+      <div class="section-body">
+        <div class="field-grid">
+          <div class="field"><label>New hire annual salary (£)</label><input type="number" id="onboard_salary" value="75000" min="0" class="is-default" /></div>
+          <div class="field"><label>Months to full productivity</label><input type="number" id="onboard_months" value="6" min="1" max="12" class="is-default" /></div>
+        </div>
+        <div class="field-grid one">
+          <div class="field"><label>Assumed productivity during onboarding (%)</label><input type="number" id="onboard_productivity" value="70" min="0" max="100" class="is-default" /></div>
+        </div>
+        <div class="hint">Industry research puts time to full productivity at 3 to 12 months. For senior roles in regulated environments, 6 months is the median. The cost compounds when the wrong hire was made.<br><br>Includes employer NI, pension, holiday, healthcare and life insurance. Excludes bonuses and benefits in kind, see the failed hire section for full methodology.</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">        <div>
+          <span class="section-title">Failed hire:</span>
+          <div class="section-progress">8 of 8</div>
+        </div>
+        <span class="section-cost" id="s9_cost">£0</span>
+      </div>
+      <div class="section-body">
+        <div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;">
+          <div class="toggle-row" style="margin-bottom:0;">
+            <label class="tlabel">Previous hire for this role failed?</label>
+            <span style="font-size:11px;color:var(--ink);margin-right:8px;">Toggle on to calculate</span>
+            <label class="switch"><input type="checkbox" id="failed_toggle" checked /><span class="switch-track"></span></label>
+          </div>
+          <div class="conditional on" id="failed_fields">
+            <div class="field-grid" style="margin-top:12px;">
+              <div class="field"><label>Annual salary of the failed hire (£)</label><input type="number" id="failed_salary" value="75000" min="0" class="is-default" /></div>
+              <div class="field"><label>Weeks in role before it failed</label><input type="number" id="failed_weeks" value="12" min="0" class="is-default" /></div>
+            </div>
+            <div class="hint">Includes employer NI, 10% pension, 25 days holiday, healthcare and life insurance. Excludes bonuses and benefits in kind.<br><br>A 1.5x multiplier covers management fallout, team disruption and rehire costs. CIPD puts the true cost of a failed senior hire at 1x to 4x annual salary.<br><br>1.5x is conservative for a Life Sciences IT role. Failed hires almost always trace back to an undefined brief.</div>
+          </div>
+        </div>
+        <div id="failed_fields_settlement" style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;">
+          <div class="toggle-row" style="margin-bottom:0;">
+            <label class="tlabel">Settlement fee incurred?</label>
+            <span style="font-size:11px;color:var(--ink);margin-right:8px;">Toggle on to calculate</span>
+            <label class="switch"><input type="checkbox" id="settlement_toggle" /><span class="switch-track"></span></label>
+          </div>
+          <div class="conditional" id="settlement_fields">
+            <div class="field-grid one" style="margin-top:12px;">
+              <div class="field"><label>Settlement amount (£)</label><input type="number" id="settlement_cost" value="18750" min="0" class="is-default" /></div>
+            </div>
+            <div class="hint">Defaults to 3 months salary. Under 2 years service, legal exposure is limited. Over 2 years, it increases. Adjust to reflect your actual situation or legal advice received.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="results-card">
+
+      <div class="results-head">
+        <div class="results-heading" style="color:white;">Your hidden cost exposure</div>
+      </div>
+
+      <div class="results-body">
+        <div class="cost-line"><span class="cost-name">Management time:</span><span class="cost-val" id="r_mgmt">£0</span></div>
+        <div class="cost-line"><span class="cost-name">Team absorption:</span><span class="cost-val" id="r_absorption">£0</span></div>
+        <div class="cost-line"><span class="cost-name">Contractor cover:</span><span class="cost-val" id="r_contractor">£0</span></div>
+        <div class="cost-line"><span class="cost-name">Single consultant cover:</span><span class="cost-val" id="r_single_consultant">£0</span></div>
+        <div class="cost-line"><span class="cost-name">Delivery impact:</span><span class="cost-val" id="r_delivery">£0</span></div>
+        <div class="cost-line"><span class="cost-name">Onboarding cost:</span><span class="cost-val" id="r_onboarding">£0</span></div>
+        <div class="cost-line"><span class="cost-name">Failed hire:</span><span class="cost-val" id="r_failed">£0</span></div>
+        <div class="cost-line"><span class="cost-name">Settlement cost:</span><span class="cost-val" id="r_settlement">£0</span></div>
+
+        <div class="total-block">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+            <span style="font-size:11px;font-weight:500;letter-spacing:0.05em;color:white;">Total exposure:</span>
+            <span style="font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums;" id="r_total">£0</span>
+          </div>
+          <div class="total-note" style="text-align:right;">Excludes VAT</div>
+          
+        </div>
+      </div>
+
+      <div class="verdict-block" id="verdict_box"></div>
+
+      <!-- COMMERCIAL CASE -->
+      <div class="roi-block" id="roi_block">
+        <div style="padding-bottom:0.75rem;margin-bottom:0.75rem;border-bottom:1px solid rgba(255,255,255,0.08);">
+          <div class="results-heading" style="color:white;">Cost of a well-run process</div>
+        </div>
+        <div class="cost-line"><span class="cost-name"><span style="color:#00ff00;font-weight:600;">nu</span>future fee (25% of salary):</span><span class="cost-val" style="color:white;" id="roi_fee_line">£0</span></div>
+        <div class="cost-line"><span class="cost-name">15hrs of hiring manager time:</span><span class="cost-val" style="color:white;" id="roi_hm_cost">£0</span></div>
+        <div class="cost-line" style="border-bottom:none;padding:2px 0 4px 0;"><span class="cost-name" style="color:rgba(255,255,255,0.5);font-size:11px;">Interviews, meetings, CV review</span></div>
+        <div class="cost-line"><span class="cost-name">5hrs of HR time:</span><span class="cost-val" style="color:white;" id="roi_hr_cost">£0</span></div>
+        <div class="cost-line" style="border-bottom:none;padding:2px 0 4px 0;"><span class="cost-name" style="color:rgba(255,255,255,0.5);font-size:11px;">Internal approvals, references &amp; onboarding</span></div>
+        <div class="cost-line" style="border-bottom:none;padding:2px 0 8px 0;"><span class="cost-name" style="color:white;font-size:11px;">Over a 5 week period</span></div>
+        <div style="padding-top:8px;border-top:1px solid rgba(255,255,255,0.15);display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <span style="font-size:11px;font-weight:500;letter-spacing:0.05em;color:white;">Total process cost:</span>
+          <span style="font-size:1.4rem;font-weight:700;color:#00ff00;font-variant-numeric:tabular-nums;" id="roi_process">£0</span>
+        </div>
+        <div id="roi_ratio_text" style="font-size:12px;color:white;font-weight:600;line-height:1.5;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.15);"></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:7px;">
+          <span style="font-size:12px;color:white;font-weight:600;">The cost of not fixing it:</span>
+          <span style="font-size:1.4rem;font-weight:700;color:#FF0000;font-variant-numeric:tabular-nums;" id="roi_difference">£0</span>
+        </div>
+        <div style="font-size:11px;color:white;margin-top:10px;line-height:1.5;">Getting the brief right first time is not a process improvement. It is a financial decision.</div>
+      </div>
+
+      <div class="cta-block">
+        <p>This number is not fixed, it grows every week. Let's talk about fixing it.</p>
+        <a class="cta-btn" href="https://outlook.office.com/bookwithme/user/17d86e86a9c643ef8b69c10c8ebc6cab@nufuture.co.uk?anonymous&ismsaljsauthenabled&ep=pcard" target="_blank">Book your free 30-minute chat</a>
+        <button class="reset-btn" onclick="downloadResults()">Download results</button>
+        <button class="reset-btn" id="share_btn" onclick="shareCalculator()">Share with a colleague</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:5px;">
+          <button class="reset-btn" style="margin-top:0;" onclick="clearCalculator()">Clear calculator</button>
+          <button class="reset-btn" style="margin-top:0;" onclick="resetForm()">Reset calculator</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div style="max-width:860px;margin:0 auto;padding:0 1.25rem 2.5rem;" id="main-footer">
+  <div style="font-size:11px;color:var(--ink-light);line-height:1.7;margin-top:0;">
+    <div>Registered address: 98 Kings Street, Knutsford, WA16 6HQ &nbsp;|&nbsp; Registered company number: 12330160 &nbsp;|&nbsp; VAT registration number: 340466515</div>
+    <div style="margin-top:4px;">Figures are based on Life Sciences IT benchmarks and user inputs. They are intended to surface hidden costs, not replace financial or legal advice.</div>
+  </div>
+</div>
+
+<!-- PRINT SUMMARY — hidden until download -->
+
+
+<script>
+  const fmt = v => "£" + Math.round(v).toLocaleString("en-GB");
+
+  const DEFAULTS = {
+    salary:75000, num_hires:1, weeks_open:12, covering_people:2, covering_salary:65000,
+    extra_days:1, hm_hours:4, hr_hours:6, hm_salary:90000, hr_salary:70000, weeks_over:10,
+    day_rate:550, contractor_weeks:26,
+    single_consultant_rate:1500, single_consultant_weeks:26,
+    consultancy_headcount:5, consultancy_rate:1500, consultancy_days:26,
+    failed_salary:75000, failed_weeks:12, settlement_cost:18750,
+    delivery_cost:50000, onboard_salary:75000, onboard_months:6, onboard_productivity:70
+  };
+
+  function n(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+  function syncToggles() {
+    const pairs = [
+      ["contractor_toggle","contractor_fields"],
+      ["single_consultant_toggle","single_consultant_fields"],
+      ["consultancy_toggle","consultancy_fields"],
+      ["failed_toggle","failed_fields"],
+      ["settlement_toggle","settlement_fields"],
+      ["delivery_toggle","delivery_fields"]
+    ];
+    pairs.forEach(([tid, fid]) => {
+      const cb = document.getElementById(tid);
+      const fd = document.getElementById(fid);
+      if (cb && fd) { fd.classList.toggle("on", cb.checked); }
+    });
+    // Settlement box always visible - independent of failed toggle
+  }
+
+  function calc() {
+    const salary = n("salary");
+    const num_hires = Math.max(1, n("num_hires"));
+    const hm_salary = n("hm_salary"), hr_salary = n("hr_salary");
+    const hm_hourly = hm_salary > 0 ? hm_salary / 46 / 5 / 8 : 0;
+    const hr_hourly = hr_salary > 0 ? hr_salary / 46 / 5 / 8 : 0;
+    const mgmt = ((n("hm_hours") * hm_hourly) + (n("hr_hours") * hr_hourly)) * 5 * n("weeks_over");
+    const absorption = (n("covering_salary") / 46 / 5) * n("extra_days") * n("weeks_open") * n("covering_people") * num_hires;
+
+    const ir35 = document.getElementById("ir35_toggle").checked;
+    const base_contractor = document.getElementById("contractor_toggle").checked ? n("day_rate") * 5 * n("contractor_weeks") : 0;
+    const contractor = ir35 ? Math.round(base_contractor * 1.138) : base_contractor;
+    const ir35_hint = document.getElementById("ir35_hint");
+    if (ir35_hint) {
+      const dr = n("day_rate") > 0 ? n("day_rate") : 550;
+      const uplift = Math.round(dr * 0.138);
+      if (ir35) {
+        ir35_hint.textContent = "Inside IR35, employer NI of 13.8% is payable on top of the day rate. At £" + dr.toLocaleString("en-GB") + " per day, the true cost is £" + Math.round(dr * 1.138).toLocaleString("en-GB") + " per day — an uplift of £" + uplift.toLocaleString("en-GB") + ". Most organisations do not account for this when comparing contractor costs to permanent hire.";
+      } else {
+        ir35_hint.textContent = "At £400 to £800 per day, a 26-week cover engagement costs between £52,000 and £104,000. That is the direct cost of a delayed or failed process.";
+      }
+    }
+
+    const single_consultant = document.getElementById("single_consultant_toggle").checked
+      ? n("single_consultant_rate") * 5 * n("single_consultant_weeks") : 0;
+
+    const consultancy = document.getElementById("consultancy_toggle").checked
+      ? n("consultancy_headcount") * n("consultancy_rate") * n("consultancy_days") * 5 : 0;
+
+    const fs = n("failed_salary"), fw = n("failed_weeks");
+    const tec = fs + Math.max(0,(fs-9100)*0.138) + fs*0.10 + (fs/261)*25 + 1200;
+    const failed = document.getElementById("failed_toggle").checked && fw > 0 ? (fw/52)*tec*1.5 : 0;
+    const settlement_on = document.getElementById("settlement_toggle") && document.getElementById("settlement_toggle").checked;
+    const settlement = settlement_on ? n("settlement_cost") : 0;
+    const delivery = document.getElementById("delivery_toggle").checked ? n("delivery_cost") : 0;
+    const os = n("onboard_salary"), om = n("onboard_months"), op = n("onboard_productivity")/100;
+    const onboarding = os > 0 && om > 0 ? (os/12*om)*(1-op)*1.28 : 0;
+
+    const total = mgmt + absorption + contractor + single_consultant + failed + settlement + delivery + onboarding;
+
+    document.getElementById("r_mgmt").textContent = fmt(mgmt);
+    document.getElementById("r_absorption").textContent = fmt(absorption);
+    document.getElementById("r_contractor").textContent = fmt(contractor);
+    document.getElementById("r_single_consultant").textContent = fmt(single_consultant);
+    document.getElementById("r_failed").textContent = failed > 0 ? fmt(failed) : "£0";
+    document.getElementById("r_failed").classList.toggle("active", failed > 0);
+    document.getElementById("r_settlement").textContent = settlement > 0 ? fmt(settlement) : "£0";
+    document.getElementById("r_settlement").classList.toggle("active", settlement > 0);
+    document.getElementById("r_delivery").textContent = fmt(delivery);
+    document.getElementById("r_onboarding").textContent = fmt(onboarding);
+    document.getElementById("r_total").textContent = fmt(total);
+    document.getElementById("s3_cost").textContent = fmt(mgmt);
+    document.getElementById("s4_cost").textContent = fmt(absorption);
+    document.getElementById("s5_cost").textContent = fmt(contractor);
+    document.getElementById("s6_cost").textContent = fmt(single_consultant);
+    document.getElementById("s7_cost").textContent = fmt(delivery);
+    document.getElementById("s8_cost").textContent = fmt(onboarding);
+    document.getElementById("s9_cost").textContent = fmt(failed + settlement);
+
+    document.querySelectorAll(".cost-val").forEach(el => {
+      const v = parseInt(el.textContent.replace(/[£,]/g,""));
+      el.classList.toggle("active", v > 0);
+    });
+
+    // Single consultant cost display
+    const sc_on = document.getElementById("single_consultant_toggle").checked;
+    const singleCostDisplay = document.getElementById("single_cost_display");
+    if (singleCostDisplay) {
+      singleCostDisplay.textContent = sc_on ? fmt(single_consultant) : "£0";
+    }
+    const scHint = document.getElementById("sc_hint");
+    if (scHint && sc_on) {
+      const sc_rate = n("single_consultant_rate") > 0 ? n("single_consultant_rate") : 1500;
+      const role_salary = salary > 0 ? salary : 75000;
+      scHint.textContent = "You are paying £" + sc_rate.toLocaleString("en-GB") + " per day for a consultant to cover a gap that a £" + role_salary.toLocaleString("en-GB") + " permanent hire would solve. This spend does not stop here, it compounds and the cost feeds into your total exposure.";
+    }
+
+    // Team consultant comparison box
+    const tc_on = document.getElementById("consultancy_toggle").checked;
+    // Team cost display
+    const teamCostDisplay = document.getElementById("team_cost_display");
+    if (teamCostDisplay) {
+      teamCostDisplay.textContent = tc_on ? fmt(consultancy) : "£0";
+    }
+
+    // Multiplier removed
+
+    // Verdict
+    const vbox = document.getElementById("verdict_box");
+    if (total > 0) {
+      vbox.style.display = "block";
+      if (total < 25000) { vbox.className = "verdict-block low"; vbox.textContent = "Cost exposure is contained for now. It will not stay that way. Every week adds to this number."; }
+      else if (total < 100000) { vbox.className = "verdict-block med"; vbox.textContent = "This is a significant cost that requires action. A structured process, starting with a properly defined brief, would recover much of this."; }
+      else { vbox.className = "verdict-block red"; vbox.textContent = "This has moved beyond a recruitment problem. That is the cost of starting without a properly defined brief. In contractor terms, it is the equivalent of " + Math.round(total / 550 / 5) + " weeks at £550 per day."; }
+    } else { vbox.style.display = "none"; }
+
+    // ROI block
+    const roiBlock = document.getElementById("roi_block");
+    if (total > 0) {
+      const roi_salary = salary > 0 ? salary : 75000;
+      const fee = Math.round(roi_salary * 0.25);
+      const roi_hm_hourly = hm_salary > 0 ? hm_salary/46/5/8 : 90000/46/5/8;
+      const roi_hr_hourly = hr_salary > 0 ? hr_salary/46/5/8 : 70000/46/5/8;
+      const hmc = Math.round(roi_hm_hourly * 15);
+      const hrc = Math.round(roi_hr_hourly * 5);
+      const pc = fee + hmc + hrc;
+      const diff = total - pc;
+      document.getElementById("roi_fee_line").textContent = fmt(fee);
+      document.getElementById("roi_hm_cost").textContent = fmt(hmc);
+      document.getElementById("roi_hr_cost").textContent = fmt(hrc);
+      document.getElementById("roi_process").textContent = fmt(pc);
+      document.getElementById("roi_difference").textContent = diff > 0 ? fmt(diff) : "—";
+      const ratioEl = document.getElementById("roi_ratio_text");
+      ratioEl.textContent = diff > 0
+        ? "A well-run process for this role should cost " + fmt(pc) + ". Your current exposure is " + fmt(total) + ". The gap is the cost of not getting it right first time."
+        : "Your exposure is within the expected cost of a well-run process.";
+      roiBlock.style.display = "block";
+    } else { roiBlock.style.display = "none"; }
+
+    // URL state persistence
+    updateURL();
+
+    syncToggles();
+  }
+
+  function updateURL() {
+    const params = new URLSearchParams();
+    Object.keys(DEFAULTS).forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.value !== String(DEFAULTS[id])) params.set(id, el.value);
+    });
+    // Save toggle states
+    ["contractor_toggle","ir35_toggle","single_consultant_toggle","consultancy_toggle","failed_toggle","delivery_toggle"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.checked !== getDefaultToggle(id)) params.set(id, el.checked ? "1" : "0");
+    });
+    const newURL = window.location.pathname + (params.toString() ? "?" + params.toString() : "");
+    history.replaceState(null, "", newURL);
+  }
+
+  function getDefaultToggle(id) {
+    return ["contractor_toggle","failed_toggle","settlement_toggle","delivery_toggle"].includes(id);
+  }
+
+  function loadFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    params.forEach((val, key) => {
+      const el = document.getElementById(key);
+      if (el) {
+        if (el.type === "checkbox") { el.checked = val === "1"; }
+        else { el.value = val; el.classList.remove("is-default"); el.classList.add("is-user"); }
+      }
+    });
+  }
+
+  function clearCalculator() {
+    // Clear all fields to 0/empty, do not restore defaults
+    Object.keys(DEFAULTS).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.value = ""; el.classList.remove("is-default"); el.classList.add("is-user"); }
+    });
+    document.getElementById("contractor_toggle").checked = false;
+    document.getElementById("ir35_toggle").checked = false;
+    document.getElementById("single_consultant_toggle").checked = false;
+    document.getElementById("consultancy_toggle").checked = false;
+    document.getElementById("failed_toggle").checked = false;
+    document.getElementById("settlement_toggle").checked = false;
+    document.getElementById("delivery_toggle").checked = false;
+    syncToggles();
+    history.replaceState(null, "", window.location.pathname);
+    calc();
+  }
+
+  function resetForm() {
+    Object.entries(DEFAULTS).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) { el.value = val; el.classList.add("is-default"); el.classList.remove("is-user"); }
+    });
+    document.getElementById("contractor_toggle").checked = true;
+    document.getElementById("ir35_toggle").checked = false;
+    document.getElementById("single_consultant_toggle").checked = false;
+    document.getElementById("consultancy_toggle").checked = false;
+    document.getElementById("failed_toggle").checked = true;
+    document.getElementById("settlement_toggle").checked = false;
+    document.getElementById("delivery_toggle").checked = true;
+    syncToggles();
+    history.replaceState(null, "", window.location.pathname);
+    calc();
+  }
+
+  function downloadResults() {
+    const dl_salary = parseFloat(document.getElementById("salary").value) || 75000;
+    const rows = [
+      ["Role annual salary", fmt(dl_salary)],
+      ["Management time", document.getElementById("r_mgmt").textContent],
+      ["Team absorption", document.getElementById("r_absorption").textContent],
+      ["Contractor cover", document.getElementById("r_contractor").textContent],
+      ["Single consultant cover", document.getElementById("r_single_consultant").textContent],
+      ["Delivery impact", document.getElementById("r_delivery").textContent],
+      ["Onboarding cost", document.getElementById("r_onboarding").textContent],
+      ["Failed hire", document.getElementById("r_failed").textContent],
+      ["Settlement cost", document.getElementById("r_settlement").textContent],
+      ["Total exposure", document.getElementById("r_total").textContent],
+      ["", ""],
+      ["Cost of a well-run process", document.getElementById("roi_process").textContent],
+      ["", ""],
+      ["The cost of not fixing it", (parseFloat(document.getElementById("r_total").textContent.replace(/[^0-9.]/g,"")) > 0) ? document.getElementById("roi_difference").textContent : "£0"],
+    ];
+
+    const amber = "#FF7E00";
+    const red = "#CC0000";
+    const green = "#007700";
+
+    let html = "<table style=\"width:100%;border-collapse:collapse;font-size:13px;color:#000;\">";
+    rows.forEach(([label, val]) => {
+      if (!label) { html += "<tr><td colspan=\"2\" style=\"padding:16px 0 0 0;border-bottom:none;\">&nbsp;</td></tr>"; return; }
+      const isTotal = label.includes("Total exposure");
+      const isRed = label.includes("Total exposure") || label.includes("cost of not");
+      const isGreen = label.includes("well-run");
+      const isBig = label.includes("Total exposure") || label.includes("well-run") || label.includes("cost of not");
+      const isAmber = !isTotal && !isGreen && !label.includes("salary") && !label.includes("cost of not") && !label.includes("well-run");
+      const isZero = val === "£0";
+      const colour = isRed ? red : isGreen ? green : (isAmber && !isZero) ? amber : "#000000";
+      const labelWithColon = label.endsWith(":") ? label : label + ":";
+      const topPad = label.includes("cost of not") ? "padding-top:16px;" : "";
+      html += "<tr style=\"border-bottom:1px solid #eee;\">";
+      html += "<td style=\"padding:7px 0;" + topPad + "color:#000;" + (isBig ? "font-weight:700;font-size:14px;" : "") + "\">" + labelWithColon + "</td>";
+      html += "<td style=\"padding:7px 0;" + topPad + "text-align:right;font-weight:700;font-size:" + (isBig ? "14px" : "13px") + ";color:" + colour + ";\">" + val + "</td>";
+      html += "</tr>";
+    });
+    html += "</table>";
+
+    html += "<p style=\"margin-top:20px;font-size:11px;color:#999;\">johnny@nufuture.co.uk &nbsp;|&nbsp; 07377 693891</p>";
+    html += "<div style=\"margin-top:24px;padding:14px 16px;background:#f5f5f5;border-radius:4px;border-left:3px solid #333;\">";
+    html += "<p style=\"font-size:13px;color:#333;font-weight:600;margin:0;\">To save as PDF: press Cmd+P (Mac) or Ctrl+P (Windows) and select Save as PDF.</p>";
+    html += "</div>";
+
+    const w = window.open("", "_blank");
+    w.document.write("<!DOCTYPE html><html><head><title>nufuture — Hidden Cost Results</title>");
+    w.document.write("<style>@page{margin:0;}body{font-family:\'Calibri\',\'Trebuchet MS\',sans-serif;margin:0;padding:24px;background:#f7f6f2;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact;}*{box-sizing:border-box;}.wrap{max-width:860px;margin:0 auto;}</style>");
+    w.document.write("</head><body>");
+    w.document.write("<div class=\"wrap\">");
+    w.document.write("<div style=\"background:#000;padding:20px;text-align:center;border-radius:8px 8px 0 0;\">");
+    w.document.write("<img src=\"data:image/png;base64,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\" style=\"height:40px;width:auto;\" />");
+    w.document.write("<div style=\"font-size:11px;color:rgba(255,255,255,0.8);margin-top:6px;letter-spacing:0.04em;\">think differently. take action. discover hiring breakthroughs.</div>");
+    w.document.write("</div>");
+    w.document.write("<div style=\"background:#fff;border:1px solid #e0dfd8;border-top:none;border-radius:0 0 8px 8px;padding:28px;\">");
+    w.document.write("<h2 style=\"font-size:16px;font-weight:700;color:#000;margin:0 0 20px 0;padding-bottom:12px;border-bottom:1px solid #e0dfd8;\">Your hidden cost exposure</h2>");
+    w.document.write(html);
+    w.document.write("</div></div></div>");
+    w.document.write("</body></html>");
+    w.document.close();
+  }
+
+    function shareCalculator() {
+    const url = "https://nufuture-cost-calculator.netlify.app/";
+    const dl_total = document.getElementById("r_total").textContent;
+    const subject = "Hidden cost calculator — " + dl_total + " exposure identified";
+    const body = "Hi%0D%0A%0D%0AThis is worth a look.%0D%0A%0D%0Anufuture built a calculator that shows the full cost of prolonged and poor hiring processes, not just the fee.%0D%0A%0D%0ATake a look here:%0D%0A" + url;
+    window.location.href = "mailto:?subject=" + encodeURIComponent(subject) + "&body=" + body;
+  }
+
+  // Progress bar
+  window.addEventListener("scroll", function() {
+    const doc = document.documentElement;
+    const scrollTop = doc.scrollTop || document.body.scrollTop;
+    const scrollHeight = doc.scrollHeight - doc.clientHeight;
+    const pct = scrollHeight > 0 ? (scrollTop / scrollHeight) * 100 : 0;
+    document.getElementById("progress-bar").style.width = pct + "%";
+  });
+
+  // Input listeners
+  document.querySelectorAll("input[type=number]").forEach(i => {
+    i.addEventListener("focus", function() { this.select(); });
+    i.addEventListener("input", function() {
+      const dv = DEFAULTS[this.id];
+      if (dv !== undefined && parseFloat(this.value) === dv) { this.classList.add("is-default"); this.classList.remove("is-user"); }
+      else { this.classList.remove("is-default"); this.classList.add("is-user"); }
+      calc();
+    });
+  });
+
+  // Toggle listeners
+  ["contractor_toggle","ir35_toggle","single_consultant_toggle","consultancy_toggle","failed_toggle","settlement_toggle","delivery_toggle"].forEach(id => {
+    document.getElementById(id).addEventListener("change", function() { syncToggles(); calc(); });
+  });
+
+  // Init
+  loadFromURL();
+  syncToggles();
+  calc();
+</script>
+</body>
+</html>
